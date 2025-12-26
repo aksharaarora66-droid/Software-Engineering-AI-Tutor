@@ -1,34 +1,57 @@
 import streamlit as st
-from google import genai
-from dotenv import load_dotenv
-import speech_recognition as sr
 import os
+from google import genai
+from google.genai import types
+import speech_recognition as sr
+from io import BytesIO
 
-# --- 1. SETUP ---
-load_dotenv()
+# --- 1. CONFIGURATION ---
+st.set_page_config(page_title="AI Voice Tutor", page_icon="🎤")
+st.title("🎓 Software Engineering AI Tutor")
 
-# Streamlit UI Header
-st.title("Software Engineering AI Tutor")
-st.write("Click the button below and speak to start.")
+# Configure GenAI (Use secrets for deployment)
+# Locally, this falls back to an environment variable
+api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
+client = genai.Client(api_key=api_key)
 
-# --- 2. AUDIO FUNCTION ---
-def play_response_audio(file_path):
-    """
-    Plays audio through the user's browser.
-    'playsound' is removed because it doesn't work on cloud servers.
-    """
-    if os.path.exists(file_path):
-        with open(file_path, "rb") as f:
-            audio_bytes = f.read()
-            st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-    else:
-        st.error("Audio file not found.")
+# --- 2. THE LOGIC ---
 
-# --- 3. CORE LOGIC ---
-# Example placement of audio trigger
-if st.button("Listen to Tutor"):
-    # Insert your speech-to-text or GenAI logic here
-    st.info("Playing response...")
+def get_ai_response(user_text):
+    """Sends transcribed text to Gemini and returns the text response."""
+    prompt = f"You are a helpful Software Engineering Tutor. Answer this: {user_text}"
+    response = client.models.generate_content(
+        model="gemini-2.0-flash", 
+        contents=prompt
+    )
+    return response.text
+
+def transcribe_audio(audio_bytes):
+    """Converts the recorded audio bytes into text."""
+    recognizer = sr.Recognizer()
+    audio_file = BytesIO(audio_bytes)
+    with sr.AudioFile(audio_file) as source:
+        audio_data = recognizer.record(source)
+    try:
+        return recognizer.recognize_google(audio_data)
+    except:
+        return "Could not understand audio."
+
+# --- 3. THE UI ---
+
+# Streamlit's built-in microphone widget
+audio_value = st.audio_input("Record your question")
+
+if audio_value:
+    st.audio(audio_value) # Play back what you recorded
     
-    # Replace 'response.mp3' with your actual filename
-    # play_response_audio("response.mp3")
+    with st.spinner("Transcribing..."):
+        user_text = transcribe_audio(audio_value.read())
+        st.write(f"**You said:** {user_text}")
+    
+    with st.spinner("Tutor is thinking..."):
+        ai_text = get_ai_response(user_text)
+        st.subheader("Tutor Response:")
+        st.write(ai_text)
+        
+        # Note: For actual Voice output, you would use a TTS library 
+        # or Gemini's native TTS features here.
