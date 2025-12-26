@@ -1,83 +1,95 @@
 import streamlit as st
 import os
-import PyPDF2
 from google import genai
-from gtts import gTTS
-import base64
-from streamlit_mic_recorder import speech_to_text
-from dotenv import load_dotenv
+import PyPDF2
+import io
 
-# --- INITIALIZATION ---
-load_dotenv()
-client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-MODEL_ID = "gemini-2.5-flash"
+# --- 1. SETUP & CONFIGURATION ---
+st.set_page_config(page_title="Software Engineering AI Tutor", page_icon="🎓", layout="wide")
 
-st.set_page_config(page_title="AI SE Tutor", page_icon="🎓", layout="wide")
+# Get API Key from Streamlit Secrets
+api_key = st.secrets.get("GOOGLE_API_KEY")
 
-# Persistent State
-if "score" not in st.session_state:
-    st.session_state.score = 0
-    st.session_state.total = 0
-    st.session_state.current_question = ""
-    st.session_state.pdf_text = ""
+if not api_key:
+    st.error("API Key not found. Please check your Streamlit Secrets.")
+    st.stop()
 
-# --- FUNCTIONS ---
-def autoplay_audio(text):
-    tts = gTTS(text=text, lang='en')
-    tts.save("temp.mp3")
-    with open("temp.mp3", "rb") as f:
-        data = f.read()
-        b64 = base64.b64encode(data).decode()
-        md = f'<audio autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
-        st.markdown(md, unsafe_allow_html=True)
+client = genai.Client(api_key=api_key)
+MODEL_ID = "gemini-1.5-flash"
 
-def get_new_question():
-    prompt = f"Context: {st.session_state.pdf_text}\nTask: Ask 1 short Software Engineering question."
-    response = client.models.generate_content(model=MODEL_ID, contents=prompt)
-    st.session_state.current_question = response.text
-
-# --- UI LAYOUT ---
+# --- 2. APP UI ---
 st.title("🎓 Software Engineering AI Tutor")
 
-with st.sidebar:
-    st.header("Settings")
-    uploaded_file = st.file_uploader("Upload your SE PDF", type="pdf")
-    if uploaded_file and not st.session_state.pdf_text:
-        reader = PyPDF2.PdfReader(uploaded_file)
-        st.session_state.pdf_text = "".join([p.extract_text() for p in reader.pages[:5]])
-        st.success("PDF Loaded!")
-
+# --- 3. THE "WHERE TO UPLOAD" HELPER ---
+# This part only shows if NO file is uploaded
+if "uploaded_file" not in st.session_state or st.session_state.uploaded_file is None:
+    # Creating a nice visual box to guide the user
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown("### ⬅️ Start Here")
+        st.info("Please use the **sidebar on the left** to upload your Software Engineering PDF notes.")
+    with col2:
+        st.markdown("""
+        ### How it works:
+        1. **Upload** your PDF in the sidebar.
+        2. **Wait** for the AI to read your notes.
+        3. **Quiz Yourself** with AI-generated questions!
+        """)
     st.divider()
-    st.metric("Score", f"{st.session_state.score} / {st.session_state.total}")
-    if st.button("Reset Score"):
-        st.session_state.score = 0
-        st.session_state.total = 0
+
+# Sidebar for PDF Upload
+with st.sidebar:
+    st.header("📂 Upload Section")
+    uploaded_file = st.file_uploader("Upload your SE Notes (PDF)", type="pdf", key="pdf_uploader")
+    st.session_state.uploaded_file = uploaded_file # Store in session state
+    
+    if st.button("Clear History"):
+        st.session_state.chat_history = []
+        st.session_state.last_question = None
         st.rerun()
 
-# --- MAIN INTERFACE ---
-if st.session_state.pdf_text:
-    if st.button("Generate Next Question") or not st.session_state.current_question:
-        get_new_question()
-        autoplay_audio(st.session_state.current_question)
+# --- 4. LOGIC ---
+def extract_text_from_pdf(pdf_file):
+    pdf_reader = PyPDF2.PdfReader(pdf_file)
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text()
+    return text
 
-    st.info(f"**Question:** {st.session_state.current_question}")
+if uploaded_file:
+    # Read the PDF content
+    with st.spinner("Reading PDF..."):
+        context_text = extract_text_from_pdf(uploaded_file)
+    st.success(f"✅ Successfully loaded: {uploaded_file.name}")
 
-    st.write("Click the mic to answer:")
-    # Browser-based Microphone
-    text_input = speech_to_text(language='en', start_prompt="🎤 Start Speaking", stop_prompt="⏹️ Stop", just_once=True)
+    # Question Generation Section
+    st.subheader("📝 Practice Quiz")
+    
+    if st.button("✨ Generate a New Question"):
+        with st.spinner("🧠 AI is analyzing your notes and thinking..."):
+            try:
+                prompt = f"""
+                You are a Software Engineering Professor. 
+                Based on the following text, generate ONE multiple-choice question.
+                Format:
+                **Question:** (The question here)
+                **Options:** (A, B, C, D)
+                **Correct Answer:** (The answer)
+                **Explanation:** (Why it's correct)
+                
+                Context: {context_text[:5000]}
+                """
+                
+                response = client.models.generate_content(model=MODEL_ID, contents=prompt)
+                st.session_state.last_question = response.text
+                
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
 
-    if text_input:
-        st.write(f"**You said:** {text_input}")
-        st.session_state.total += 1
-        
-        grade_req = f"Q: {st.session_state.current_question}\nAns: {text_input}\nIs it correct? Say 'CORRECT' or 'INCORRECT' and explain."
-        feedback = client.models.generate_content(model=MODEL_ID, contents=grade_req).text
-        
-        if "CORRECT" in feedback.upper():
-            st.session_state.score += 1
-            st.balloons() # Visual celebration!
-        
-        st.success(feedback) if "CORRECT" in feedback.upper() else st.error(feedback)
-        autoplay_audio(feedback)
-else:
-    st.warning("Please upload a PDF in the sidebar to start.")
+    # Display the question
+    if st.session_state.get('last_question'):
+        st.container(border=True).markdown(st.session_state.last_question)
+
+# --- 5. FOOTER ---
+st.markdown("---")
+st.caption("Developed for Software Engineering Evaluation | AI Tutor v1.0")
