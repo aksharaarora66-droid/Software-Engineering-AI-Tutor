@@ -5,24 +5,26 @@ import PyPDF2
 import io
 
 # --- 1. SETUP & CONFIGURATION ---
+# Using version 1.56.0 of the GenAI SDK
 st.set_page_config(page_title="Software Engineering AI Tutor", page_icon="🎓", layout="wide")
 
-# Get API Key from Streamlit Secrets
+# Get API Key from Streamlit Secrets (Professional Security Standard)
 api_key = st.secrets.get("GOOGLE_API_KEY")
 
 if not api_key:
     st.error("API Key not found. Please check your Streamlit Secrets.")
     st.stop()
 
-# Initialize the Client
+# Initialize the Client for version 1.56.0
 client = genai.Client(api_key=api_key)
-# THE FIX: This specific ID works with the new SDK
+
+# The correct Model ID format for this SDK version
 MODEL_ID = "gemini-1.5-flash"
 
 # --- 2. APP UI ---
 st.title("🎓 Software Engineering AI Tutor")
 
-# --- 3. THE ONBOARDING GUIDANCE ---
+# --- 3. THE ONBOARDING GUIDANCE (UX Design) ---
 if "uploaded_file" not in st.session_state or st.session_state.uploaded_file is None:
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -57,6 +59,7 @@ def extract_text_from_pdf(pdf_file):
     return text
 
 if uploaded_file:
+    # PDF Processing Feedback
     with st.spinner("Reading PDF..."):
         context_text = extract_text_from_pdf(uploaded_file)
     st.success(f"✅ Successfully loaded: {uploaded_file.name}")
@@ -64,7 +67,7 @@ if uploaded_file:
     st.subheader("📝 Practice Quiz")
     
     if st.button("✨ Generate a New Question"):
-        # The SPINNER makes the latency look professional
+        # Spinner for professional UI during API latency
         with st.spinner("🧠 AI is analyzing your notes and thinking..."):
             try:
                 prompt = f"""
@@ -79,18 +82,18 @@ if uploaded_file:
                 Context: {context_text[:5000]}
                 """
                 
-                # API Call using the corrected MODEL_ID
+                # API Call using version 1.56.0 syntax
                 response = client.models.generate_content(model=MODEL_ID, contents=prompt)
                 st.session_state.last_question = response.text
                 
             except Exception as e:
-                # Displays helpful error info if quota or other issues occur
-                st.error(f"An error occurred: {e}")
+                # Handle Quota (429) or other API errors gracefully
+                st.error(f"Technical Error: {e}")
 
-    # Display the question in a nice border
+    # Display the generated question in a professional card
     if st.session_state.get('last_question'):
         st.container(border=True).markdown(st.session_state.last_question)
 
 # --- 5. FOOTER ---
 st.markdown("---")
-st.caption("Developed for Software Engineering Evaluation | AI Tutor v1.0")
+st.caption("Developed with Google GenAI SDK v1.56.0 | AI Tutor v1.0")
