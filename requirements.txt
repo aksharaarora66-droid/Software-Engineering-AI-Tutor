@@ -1,6 +1,5 @@
 streamlit
 google-genai
-PyPDF2
-gTTS
-streamlit-mic-recorder
 python-dotenv
+SpeechRecognition
+PyAudio
