@@ -14,16 +14,16 @@ if not api_key:
     st.error("API Key not found. Please check your Streamlit Secrets.")
     st.stop()
 
+# Initialize the Client
 client = genai.Client(api_key=api_key)
+# THE FIX: This specific ID works with the new SDK
 MODEL_ID = "gemini-1.5-flash"
 
 # --- 2. APP UI ---
 st.title("🎓 Software Engineering AI Tutor")
 
-# --- 3. THE "WHERE TO UPLOAD" HELPER ---
-# This part only shows if NO file is uploaded
+# --- 3. THE ONBOARDING GUIDANCE ---
 if "uploaded_file" not in st.session_state or st.session_state.uploaded_file is None:
-    # Creating a nice visual box to guide the user
     col1, col2 = st.columns([1, 2])
     with col1:
         st.markdown("### ⬅️ Start Here")
@@ -41,7 +41,7 @@ if "uploaded_file" not in st.session_state or st.session_state.uploaded_file is 
 with st.sidebar:
     st.header("📂 Upload Section")
     uploaded_file = st.file_uploader("Upload your SE Notes (PDF)", type="pdf", key="pdf_uploader")
-    st.session_state.uploaded_file = uploaded_file # Store in session state
+    st.session_state.uploaded_file = uploaded_file 
     
     if st.button("Clear History"):
         st.session_state.chat_history = []
@@ -57,15 +57,14 @@ def extract_text_from_pdf(pdf_file):
     return text
 
 if uploaded_file:
-    # Read the PDF content
     with st.spinner("Reading PDF..."):
         context_text = extract_text_from_pdf(uploaded_file)
     st.success(f"✅ Successfully loaded: {uploaded_file.name}")
 
-    # Question Generation Section
     st.subheader("📝 Practice Quiz")
     
     if st.button("✨ Generate a New Question"):
+        # The SPINNER makes the latency look professional
         with st.spinner("🧠 AI is analyzing your notes and thinking..."):
             try:
                 prompt = f"""
@@ -80,13 +79,15 @@ if uploaded_file:
                 Context: {context_text[:5000]}
                 """
                 
+                # API Call using the corrected MODEL_ID
                 response = client.models.generate_content(model=MODEL_ID, contents=prompt)
                 st.session_state.last_question = response.text
                 
             except Exception as e:
+                # Displays helpful error info if quota or other issues occur
                 st.error(f"An error occurred: {e}")
 
-    # Display the question
+    # Display the question in a nice border
     if st.session_state.get('last_question'):
         st.container(border=True).markdown(st.session_state.last_question)
 
