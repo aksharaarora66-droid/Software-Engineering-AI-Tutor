@@ -20,7 +20,7 @@ if not api_key:
 client = genai.Client(api_key=api_key, http_options={'api_version': 'v1'})
 
 # The correct Model ID format for this SDK version
-MODEL_ID = "gemini-1.5-flash-latest"
+MODEL_ID = "models/gemini-1.5-flash"
 
 # --- 2. APP UI ---
 st.title("🎓 Software Engineering AI Tutor")
