@@ -18,7 +18,8 @@ if not api_key:
 client = genai.Client(api_key=api_key, http_options={'api_version': 'v1'})
 
 # Using the most stable model ID for the current GenAI SDK
-MODEL_ID = "gemini-1.5-flash"
+# Update this to match the model shown in your screenshot
+MODEL_ID = "gemini-3-flash-preview"
 
 # --- 2. UI LAYOUT ---
 st.title("🎓 Software Engineering AI Tutor")
