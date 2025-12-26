@@ -16,7 +16,8 @@ if not api_key:
     st.stop()
 
 # Initialize the Client for version 1.56.0
-client = genai.Client(api_key=api_key)
+# Initialize the Client with explicit API version
+client = genai.Client(api_key=api_key, http_options={'api_version': 'v1'})
 
 # The correct Model ID format for this SDK version
 MODEL_ID = "gemini-1.5-flash-latest"
